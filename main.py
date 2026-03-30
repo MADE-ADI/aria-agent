@@ -7,6 +7,10 @@ and slash-command autocomplete (arrow-key navigable).
 import sys
 import os
 import logging
+
+# ── Kill ALL logging noise by default ────────────────────────────────
+logging.disable(logging.CRITICAL)
+
 from config.settings import (
     AGENT_NAME, LLM_API_KEY, LLM_MODEL, LLM_BASE_URL,
     MAX_ITERATIONS, MEMORY_DIR, SKILLS_DIR, SESSIONS_DIR,
@@ -19,72 +23,82 @@ from core.memory import Memory
 from core.session import SessionManager
 from core.agent import Agent
 
-# Setup logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger(__name__)
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── ANSI colors ──────────────────────────────────────────────────────
+class C:
+    RESET   = "\033[0m"
+    BOLD    = "\033[1m"
+    DIM     = "\033[2m"
+    CYAN    = "\033[36m"
+    YELLOW  = "\033[33m"
+    GREEN   = "\033[32m"
+    RED     = "\033[31m"
+    MAGENTA = "\033[35m"
+    BLUE    = "\033[34m"
+    WHITE   = "\033[97m"
+    GRAY    = "\033[90m"
+    BG_DARK = "\033[48;5;235m"
+
+
+def dim(text):
+    return f"{C.DIM}{text}{C.RESET}"
+
+def cyan(text):
+    return f"{C.CYAN}{text}{C.RESET}"
+
+def yellow(text):
+    return f"{C.YELLOW}{text}{C.RESET}"
+
+def green(text):
+    return f"{C.GREEN}{text}{C.RESET}"
+
+def red(text):
+    return f"{C.RED}{text}{C.RESET}"
+
+def bold(text):
+    return f"{C.BOLD}{text}{C.RESET}"
+
+def gray(text):
+    return f"{C.GRAY}{text}{C.RESET}"
+
 
 # ── Slash commands registry ──────────────────────────────────────────
 SLASH_COMMANDS = {
-    "/skills":   "List loaded skills (builtin + user)",
+    "/skills":   "List loaded skills",
     "/memory":   "Show remembered facts",
     "/sessions": "List all sessions",
-    "/session":  "Show current session info",
-    "/new":      "Start a new session",
-    "/resume":   "Resume a previous session",
-    "/end":      "End current session",
-    "/logs":     "Toggle internal logs (on/off)",
-    "/clear":    "Clear conversation context",
-    "/model":    "Show or change model",
-    "/config":   "Show config file path & settings",
-    "/path":     "Show all Aria paths",
+    "/session":  "Current session info",
+    "/new":      "New session",
+    "/resume":   "Resume a session",
+    "/end":      "End session",
+    "/logs":     "Toggle logs (on/off)",
+    "/clear":    "Clear context",
+    "/model":    "Show/change model",
+    "/config":   "Show settings",
+    "/path":     "Show paths",
     "/help":     "Show commands",
     "/quit":     "Save & exit",
 }
 
 HELP_TEXT = f"""
-Aria — Python AI Agent v1.3
+{C.CYAN}{C.BOLD}Aria{C.RESET} — AI Agent v1.4
 
-Usage:
-  aria                     Start interactive session
-  aria -e "prompt"         Run single prompt and exit
-  aria --logs              Start with logs enabled
-  aria --help              Show this help
+{C.BOLD}Usage:{C.RESET}
+  aria                     Interactive mode
+  aria -e "prompt"         Single prompt
+  aria --logs              Start with verbose logs
+  aria --help              This help
 
-Data directory: ~/.aria/
-  config.json    — LLM provider, model, agent settings
-  skills/        — User custom skills (override built-ins)
-  memory/        — Long-term memory storage
-  sessions/      — Session history
-  logs/          — Agent logs
+{C.BOLD}Data:{C.RESET} ~/.aria/
+  config.json              Settings
+  skills/                  Custom skills
+  memory/                  Long-term memory
+  sessions/                Session history
 
-Interactive Commands (type / for autocomplete):
-  /skills          List loaded skills (builtin + user)
-  /memory          Show remembered facts
-  /sessions        List all sessions
-  /session         Show current session info
-  /new             Start a new session
-  /resume <id>     Resume a previous session
-  /end             End current session
-  /logs on|off     Show/hide agent internal logs
-  /model [name]    Show or change model
-  /config          Show config file & current settings
-  /path            Show all Aria paths
-  /clear           Clear conversation context
-  /help            Show commands
-  /quit            Save & exit
-
-Config:
-  Edit ~/.aria/config.json or use environment variables:
-  LLM_API_KEY      API key (env var overrides config)
-  LLM_MODEL        Model name
-  LLM_BASE_URL     API endpoint
-  AGENT_NAME       Agent display name
+{C.BOLD}Config:{C.RESET}
+  Edit ~/.aria/config.json or set env vars:
+  LLM_API_KEY, LLM_MODEL, LLM_BASE_URL, AGENT_NAME
 """
 
 
@@ -94,7 +108,6 @@ def _build_prompt_session(session_mgr):
     try:
         from prompt_toolkit import PromptSession
         from prompt_toolkit.completion import Completer, Completion
-        from prompt_toolkit.formatted_text import HTML
         from prompt_toolkit.styles import Style
 
         class SlashCompleter(Completer):
@@ -103,88 +116,63 @@ def _build_prompt_session(session_mgr):
 
             def get_completions(self, document, complete_event):
                 text = document.text_before_cursor
-
-                # Only trigger on text starting with /
                 if not text.startswith("/"):
                     return
 
-                # Match commands
                 for cmd, desc in SLASH_COMMANDS.items():
                     if cmd.startswith(text):
-                        yield Completion(
-                            cmd,
-                            start_position=-len(text),
-                            display_meta=desc,
-                        )
+                        yield Completion(cmd, start_position=-len(text), display_meta=desc)
 
-                # Special: /resume shows session IDs
                 if text.startswith("/resume "):
                     partial = text[len("/resume "):]
                     try:
-                        sessions = self._session_mgr.list_sessions(limit=10)
-                        for s in sessions:
+                        for s in self._session_mgr.list_sessions(limit=10):
                             sid = s["id"]
                             if sid.startswith(partial) or not partial:
-                                label = f'{s["messages"]} msgs'
                                 yield Completion(
-                                    f"/resume {sid}",
-                                    start_position=-len(text),
-                                    display_meta=label,
+                                    f"/resume {sid}", start_position=-len(text),
+                                    display_meta=f'{s["messages"]} msgs',
                                 )
                     except Exception:
                         pass
 
-                # Special: /logs shows on/off
                 if text.startswith("/logs "):
                     partial = text[len("/logs "):]
                     for opt in ["on", "off"]:
                         if opt.startswith(partial):
-                            yield Completion(
-                                f"/logs {opt}",
-                                start_position=-len(text),
-                                display_meta=f"Turn logs {opt}",
-                            )
+                            yield Completion(f"/logs {opt}", start_position=-len(text), display_meta=f"Turn logs {opt}")
 
         style = Style.from_dict({
-            "completion-menu":                "bg:#1a1a2e #e0e0e0",
-            "completion-menu.completion":      "bg:#1a1a2e #e0e0e0",
-            "completion-menu.completion.current": "bg:#16213e #00d4ff bold",
-            "completion-menu.meta":            "bg:#1a1a2e #888888",
-            "completion-menu.meta.current":    "bg:#16213e #aaaaaa",
-            "scrollbar.background":            "bg:#1a1a2e",
-            "scrollbar.button":                "bg:#16213e",
+            "completion-menu":                   "bg:#1e1e2e #cdd6f4",
+            "completion-menu.completion":         "bg:#1e1e2e #cdd6f4",
+            "completion-menu.completion.current": "bg:#313244 #89b4fa bold",
+            "completion-menu.meta":               "bg:#1e1e2e #6c7086",
+            "completion-menu.meta.current":       "bg:#313244 #a6adc8",
+            "scrollbar.background":               "bg:#1e1e2e",
+            "scrollbar.button":                   "bg:#313244",
         })
 
-        return PromptSession(
-            completer=SlashCompleter(session_mgr),
-            complete_while_typing=True,
-            style=style,
-        )
+        return PromptSession(completer=SlashCompleter(session_mgr), complete_while_typing=True, style=style)
     except ImportError:
         return None
 
 
-def _fallback_input(prompt_str: str) -> str:
-    """Fallback to plain input() if prompt_toolkit isn't available."""
-    return input(prompt_str)
-
-
-def print_banner(agent_name: str, skills_count: int, session_id: str):
-    print(f"""
-╔══════════════════════════════════════════╗
-║  🤖 {agent_name:^36s} ║
-║  Python AI Agent Framework v1.3         ║
-║  {skills_count} skills loaded | session: {session_id[:16]:16s}║
-╚══════════════════════════════════════════╝
-
-  Config:  ~/.aria/config.json
-  Skills:  ~/.aria/skills/
-  Type / to see commands (arrow keys to navigate)
-""")
+def print_banner(agent_name: str, model: str, skills_count: int, session_id: str):
+    model_short = model[:28]
+    skills_str = f"{skills_count} skills • session {session_id[:8]}"
+    print()
+    print(f"  {C.CYAN}┌──────────────────────────────────────┐{C.RESET}")
+    print(f"  {C.CYAN}│{C.RESET}  🤖 {C.BOLD}{agent_name}{C.RESET}{' ' * (31 - len(agent_name))}{C.CYAN}│{C.RESET}")
+    print(f"  {C.CYAN}│{C.RESET}  {gray(model_short)}{' ' * (33 - len(model_short))}{C.CYAN}│{C.RESET}")
+    print(f"  {C.CYAN}│{C.RESET}  {gray(skills_str)}{' ' * (33 - len(skills_str))}{C.CYAN}│{C.RESET}")
+    print(f"  {C.CYAN}└──────────────────────────────────────┘{C.RESET}")
+    print()
+    print(f"  {gray('Type / for commands • /help for details')}")
+    print()
 
 
 def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
-    """Handle slash commands. Returns True if command was handled, 'quit' to exit."""
+    """Handle slash commands. Returns True if handled, 'quit' to exit."""
     from config.settings import (
         USER_CONFIG_FILE, ARIA_HOME, ARIA_SRC, BUILTIN_SKILLS_DIR,
         SKILLS_DIR, MEMORY_DIR, SESSIONS_DIR, AGENT_NAME, MAX_ITERATIONS,
@@ -195,166 +183,169 @@ def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
     if user_input == "/quit":
         session_mgr.save_current()
         memory.save_session()
-        print("👋 Session saved. Bye!")
+        print(f"\n  {gray('Session saved. Goodbye!')} 👋\n")
         return "quit"
 
     elif user_input == "/help":
-        print("\n📖 Available Commands:")
+        print(f"\n  {bold('Commands:')}")
         for cmd, desc in SLASH_COMMANDS.items():
-            print(f"  {cmd:14s}  {desc}")
+            print(f"  {cyan(f'{cmd:12s}')}  {desc}")
         print()
         return True
 
     elif user_input == "/skills":
-        print("\n📦 Loaded Skills:")
-        for s in skills.list_all():
-            badge = "📌" if s.get("source") == "user" else "📦"
-            print(f"  {badge} {s['name']}: {s['description']}")
-            print(f"     triggers: {', '.join(s['triggers'])}")
-        builtin_count = sum(1 for s in skills.list_all() if s.get("source") == "builtin")
-        user_count = sum(1 for s in skills.list_all() if s.get("source") == "user")
-        print(f"\n  📦 {builtin_count} built-in  |  📌 {user_count} user (~/.aria/skills/)")
+        all_skills = skills.list_all()
+        builtin = [s for s in all_skills if s.get("source") == "builtin"]
+        user = [s for s in all_skills if s.get("source") == "user"]
+
+        print(f"\n  {bold('Skills')} {gray(f'({len(all_skills)} total)')}")
+        if builtin:
+            print(f"\n  {dim('Built-in:')}")
+            for s in builtin:
+                print(f"    {cyan(s['name']):20s}  {s['description']}")
+        if user:
+            print(f"\n  {dim('User (~/.aria/skills/):')}")
+            for s in user:
+                print(f"    {green(s['name']):20s}  {s['description']}")
+        if not all_skills:
+            print(f"    {gray('No skills loaded')}")
         print()
         return True
 
     elif user_input == "/memory":
         facts = memory.long_term.get("facts", [])
-        print(f"\n🧠 Memory ({len(facts)} facts):")
-        for f in facts[-10:]:
-            print(f"  • {f['fact']}")
+        print(f"\n  {bold('Memory')} {gray(f'({len(facts)} facts)')}")
+        if facts:
+            for f in facts[-10:]:
+                print(f"    • {f['fact']}")
+        else:
+            print(f"    {gray('No memories yet')}")
         print()
         return True
 
     elif user_input == "/sessions":
         sessions = session_mgr.list_sessions()
-        print(f"\n📂 Sessions ({len(sessions)}):")
+        print(f"\n  {bold('Sessions')} {gray(f'({len(sessions)} total)')}")
         for s in sessions:
-            marker = " ← active" if active and s["id"] == active.id else ""
-            print(f"  [{s['id'][:16]}] {s['messages']} msgs | {s['updated']}{marker}")
-            if s["preview"]:
-                print(f'    └─ "{s["preview"][:60]}..."')
+            marker = f" {green('● active')}" if active and s["id"] == active.id else ""
+            print(f"    {cyan(s['id'][:16])}  {s['messages']:3d} msgs  {gray(s['updated'])}{marker}")
+        if not sessions:
+            print(f"    {gray('No sessions')}")
         print()
         return True
 
     elif user_input == "/session":
         if active:
-            print(f"\n📌 Current Session:")
-            print(f"  ID:       {active.id}")
-            print(f"  User:     {active.user_id}")
-            print(f"  Messages: {active.message_count}")
             from datetime import datetime
-            print(f"  Created:  {datetime.fromtimestamp(active.created_at).isoformat()}")
-            print(f"  Updated:  {datetime.fromtimestamp(active.updated_at).isoformat()}")
+            print(f"\n  {bold('Current Session')}")
+            print(f"    ID:        {cyan(active.id)}")
+            print(f"    Messages:  {active.message_count}")
+            print(f"    Created:   {gray(datetime.fromtimestamp(active.created_at).strftime('%Y-%m-%d %H:%M'))}")
+            print(f"    Updated:   {gray(datetime.fromtimestamp(active.updated_at).strftime('%Y-%m-%d %H:%M'))}")
         else:
-            print("\n⚠️  No active session. Use /new to create one.")
+            print(f"\n  {gray('No active session. Use /new')}")
         print()
         return True
 
     elif user_input == "/new":
         session_mgr.save_current()
         session = session_mgr.create(user_id="default")
-        print(f"\n✨ New session: {session.id}\n")
+        print(f"\n  {green('✓')} New session: {cyan(session.id[:16])}\n")
         return True
 
     elif user_input.startswith("/resume"):
         parts = user_input.split(maxsplit=1)
         if len(parts) < 2:
-            print("\n⚠️  Usage: /resume <session_id>")
+            print(f"\n  Usage: {cyan('/resume <session_id>')}")
             sessions = session_mgr.list_sessions(limit=5)
             if sessions:
-                print("  Available:")
                 for s in sessions:
-                    print(f"    {s['id'][:16]}  ({s['messages']} msgs)")
+                    print(f"    {cyan(s['id'][:16])}  ({s['messages']} msgs)")
             print()
             return True
         target_id = parts[1].strip()
-        matched = None
-        for sid in session_mgr.sessions:
-            if sid.startswith(target_id):
-                matched = sid
-                break
+        matched = next((sid for sid in session_mgr.sessions if sid.startswith(target_id)), None)
         if matched:
             session_mgr.save_current()
             resumed = session_mgr.resume(matched)
-            print(f"\n🔄 Resumed session: {resumed.id} ({resumed.message_count} messages)\n")
+            print(f"\n  {green('✓')} Resumed: {cyan(resumed.id[:16])} ({resumed.message_count} messages)\n")
         else:
-            print(f"\n❌ Session not found: {target_id}\n")
+            print(f"\n  {red('✗')} Session not found: {target_id}\n")
         return True
 
     elif user_input == "/end":
         if active:
-            print(f"\n🔚 Ended session: {active.id}\n")
+            print(f"\n  {green('✓')} Ended: {cyan(active.id[:16])}\n")
             session_mgr.end_session()
         else:
-            print("\n⚠️  No active session.\n")
+            print(f"\n  {gray('No active session')}\n")
         return True
 
     elif user_input == "/clear":
         memory.clear_short_term()
-        print("🧹 Conversation cleared.\n")
+        print(f"\n  {green('✓')} Context cleared\n")
         return True
 
     elif user_input.startswith("/logs"):
         parts = user_input.split(maxsplit=1)
         if len(parts) < 2:
-            status = "ON" if agent.show_logs else "OFF"
-            print(f"\n📋 Logs: {status}")
-            print("  Usage: /logs on  |  /logs off\n")
+            status = green("ON") if agent.show_logs else gray("OFF")
+            print(f"\n  Logs: {status}  {gray('(/logs on | /logs off)')}\n")
         elif parts[1].strip().lower() == "on":
             agent.show_logs = True
-            print("\n📋 Logs: ON — you'll see internal agent activity\n")
+            logging.disable(logging.NOTSET)
+            logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S", force=True)
+            print(f"\n  Logs: {green('ON')}\n")
         elif parts[1].strip().lower() == "off":
             agent.show_logs = False
-            print("\n📋 Logs: OFF — clean output only\n")
+            logging.disable(logging.CRITICAL)
+            print(f"\n  Logs: {gray('OFF')}\n")
         else:
-            print("\n⚠️  Usage: /logs on  |  /logs off\n")
+            print(f"\n  Usage: {cyan('/logs on')} | {cyan('/logs off')}\n")
         return True
 
     elif user_input.startswith("/model"):
         parts = user_input.split(maxsplit=1)
         if len(parts) < 2:
-            print(f"\n🧪 Current model: {agent.llm.model}")
-            print(f"  Base URL: {agent.llm.base_url}")
-            print("  Usage: /model <model_name> to switch\n")
+            print(f"\n  {bold('Model:')}  {cyan(agent.llm.model)}")
+            print(f"  {bold('URL:')}    {gray(agent.llm.base_url)}")
+            print(f"\n  Switch: {cyan('/model <name>')}\n")
         else:
             new_model = parts[1].strip()
             agent.llm.model = new_model
-            print(f"\n🧪 Model switched to: {new_model}\n")
+            print(f"\n  {green('✓')} Model → {cyan(new_model)}\n")
         return True
 
     elif user_input == "/config":
-        print(f"\n⚙️  Configuration:")
-        print(f"  Config file:  {USER_CONFIG_FILE}")
-        print(f"  LLM provider: {LLM_API_KEY[:8]}..." if LLM_API_KEY else "  LLM provider: (not set)")
-        print(f"  Model:        {agent.llm.model}")
-        print(f"  Base URL:     {agent.llm.base_url}")
-        print(f"  Agent name:   {AGENT_NAME}")
-        print(f"  Max iters:    {MAX_ITERATIONS}")
-        print(f"\n  Edit: nano ~/.aria/config.json\n")
+        api_display = f"{LLM_API_KEY[:6]}...{LLM_API_KEY[-4:]}" if len(LLM_API_KEY) > 10 else LLM_API_KEY or gray("(not set)")
+        print(f"\n  {bold('Configuration')}")
+        print(f"    File:      {cyan(USER_CONFIG_FILE)}")
+        print(f"    API Key:   {api_display}")
+        print(f"    Model:     {cyan(agent.llm.model)}")
+        print(f"    Base URL:  {gray(agent.llm.base_url)}")
+        print(f"    Agent:     {AGENT_NAME}")
+        print(f"    Max iter:  {MAX_ITERATIONS}\n")
         return True
 
     elif user_input == "/path":
-        print(f"\n📁 Aria Paths:")
-        print(f"  Home:      {ARIA_HOME}")
-        print(f"  Config:    {USER_CONFIG_FILE}")
-        print(f"  Skills:    {SKILLS_DIR}  (user)")
-        print(f"  Builtin:   {BUILTIN_SKILLS_DIR}")
-        print(f"  Memory:    {MEMORY_DIR}")
-        print(f"  Sessions:  {SESSIONS_DIR}")
-        print(f"  Source:    {ARIA_SRC}")
-        print()
+        print(f"\n  {bold('Paths')}")
+        print(f"    Home:     {cyan(ARIA_HOME)}")
+        print(f"    Config:   {USER_CONFIG_FILE}")
+        print(f"    Skills:   {SKILLS_DIR}")
+        print(f"    Builtin:  {gray(BUILTIN_SKILLS_DIR)}")
+        print(f"    Memory:   {MEMORY_DIR}")
+        print(f"    Sessions: {SESSIONS_DIR}")
+        print(f"    Source:   {gray(ARIA_SRC)}\n")
         return True
 
     elif user_input.startswith("/"):
-        print(f"\n⚠️  Unknown command: {user_input}")
-        print("  Type / to see available commands\n")
+        print(f"\n  {red('✗')} Unknown: {user_input}  {gray('(type / for commands)')}\n")
         return True
 
     return False
 
 
 def main():
-    # ---- CLI arguments ----
     args = sys.argv[1:]
 
     if "--help" in args or "-h" in args:
@@ -369,38 +360,34 @@ def main():
         if idx + 1 < len(args):
             single_prompt = args[idx + 1]
         else:
-            print("Error: -e requires a prompt argument")
-            print('  Usage: aria -e "what\'s the weather in Bali?"')
+            print(f"  {red('✗')} -e requires a prompt")
             sys.exit(1)
-        if not enable_logs:
-            logging.disable(logging.CRITICAL)
 
     if not LLM_API_KEY:
-        print("❌ Set LLM_API_KEY environment variable first!")
-        print("   export LLM_API_KEY=sk-...")
+        print(f"\n  {red('✗')} No API key configured")
+        print(f"  {gray('Set LLM_API_KEY or edit ~/.aria/config.json')}\n")
         sys.exit(1)
 
-    # Init components
+    if enable_logs:
+        logging.disable(logging.NOTSET)
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%H:%M:%S", force=True)
+
+    # Init components (silently)
     llm = LLMClient(api_key=LLM_API_KEY, model=LLM_MODEL, base_url=LLM_BASE_URL)
     skills = SkillRegistry(SKILLS_DIR, builtin_skills_dir=BUILTIN_SKILLS_DIR)
     memory = Memory(MEMORY_DIR)
     session_mgr = SessionManager(SESSIONS_DIR)
     agent = Agent(
-        name=AGENT_NAME,
-        llm=llm,
-        skills=skills,
-        memory=memory,
-        session_mgr=session_mgr,
-        max_iterations=MAX_ITERATIONS,
+        name=AGENT_NAME, llm=llm, skills=skills, memory=memory,
+        session_mgr=session_mgr, max_iterations=MAX_ITERATIONS,
     )
 
-    # Auto-create first session
     session = session_mgr.create(user_id="default")
 
     if enable_logs:
         agent.show_logs = True
 
-    # ---- Single prompt mode: aria -e "prompt" ----
+    # ---- Single prompt mode ----
     if single_prompt:
         try:
             response = agent.run(single_prompt)
@@ -414,51 +401,53 @@ def main():
         sys.exit(0)
 
     # ---- Interactive mode ----
-    print_banner(AGENT_NAME, len(skills.skills), session.id)
-
-    # Build prompt session with autocomplete
+    print_banner(AGENT_NAME, LLM_MODEL, len(skills.skills), session.id)
     prompt_session = _build_prompt_session(session_mgr)
 
     try:
         while True:
             try:
                 active = session_mgr.get_active()
-                sid = active.id[:12] if active else "none"
-                prompt_str = f"\033[36m[{sid}] {AGENT_NAME}>\033[0m "
+                sid = active.id[:8] if active else "none"
+                prompt_str = f"{C.CYAN}{C.BOLD}{AGENT_NAME}{C.RESET} {C.GRAY}{sid}{C.RESET} {C.CYAN}›{C.RESET} "
 
                 if prompt_session:
                     from prompt_toolkit.formatted_text import ANSI
                     user_input = prompt_session.prompt(ANSI(prompt_str)).strip()
                 else:
-                    user_input = _fallback_input(prompt_str).strip()
+                    user_input = input(prompt_str).strip()
             except EOFError:
                 break
             except KeyboardInterrupt:
-                print()  # newline after ^C
+                print()
                 continue
 
             if not user_input:
                 continue
 
-            # === Handle slash commands ===
             result = handle_command(user_input, agent, session_mgr, memory, skills)
             if result == "quit":
                 break
             elif result:
                 continue
 
-            # === Agent run ===
+            # ── Agent response ───────────────────────────────────
             try:
+                print(f"\n  {gray('thinking...')}", end="\r", flush=True)
                 response = agent.run(user_input)
-                print(f"\n\033[33m{response}\033[0m\n")
+                # Clear "thinking..." line
+                print("                    ", end="\r")
+                # Print response with nice formatting
+                for line in response.split("\n"):
+                    print(f"  {line}")
+                print()
             except Exception as e:
-                logger.error(f"Agent error: {e}", exc_info=True)
-                print(f"\n❌ Error: {e}\n")
+                print(f"\n  {red('✗')} {e}\n")
 
     except KeyboardInterrupt:
         session_mgr.save_current()
         memory.save_session()
-        print("\n👋 Session saved. Bye!")
+        print(f"\n  {gray('Session saved. Goodbye!')} 👋\n")
     finally:
         llm.close()
 
