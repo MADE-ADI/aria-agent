@@ -87,7 +87,8 @@ HELP_TEXT = f"""
 {C.BOLD}Usage:{C.RESET}
   aria                     Interactive mode
   aria -e "prompt"         Single prompt
-  aria --init              Generate auth key
+  aria auth ariax-xxxxx    Activate with key
+  aria --init              Generate new auth key
   aria --logs              Start with verbose logs
   aria --help              This help
 
@@ -421,6 +422,26 @@ def main():
             print(f"\n  {gray('Keep this key safe. You need it to use Aria.')}\n")
         sys.exit(0)
 
+    # ── Auth via command: aria auth ariax-xxxxx ───────────────────
+    if args and args[0] == "auth":
+        if len(args) < 2:
+            print(f"\n  Usage: {cyan('aria auth ariax-xxxxxxxxx')}\n")
+            sys.exit(1)
+        key = args[1].strip()
+        if not key.startswith("ariax-") or len(key) < 20:
+            print(f"\n  {red('✗')} Invalid key format. Must start with ariax- and be at least 20 chars.\n")
+            sys.exit(1)
+        # Save the key
+        import json as _json
+        os.makedirs(os.path.dirname(AUTH_FILE), exist_ok=True)
+        with open(AUTH_FILE, "w") as f:
+            _json.dump({"secret_key": key}, f, indent=2)
+        os.chmod(AUTH_FILE, 0o600)
+        print(f"\n  {green('✓')} Authenticated!")
+        print(f"  Key:  {cyan(key[:12])}...{cyan(key[-6:])}")
+        print(f"  File: {gray(AUTH_FILE)}\n")
+        sys.exit(0)
+
     # ── Auth gate ────────────────────────────────────────────────
     auth = check_auth()
     if not auth["ok"]:
@@ -431,7 +452,7 @@ def main():
             print(f"  {gray('Invalid key in')} {AUTH_FILE}")
         elif auth["reason"] == "corrupt":
             print(f"  {gray('Cannot read')} {AUTH_FILE}")
-        print(f"\n  Run {cyan('aria --init')} to generate your auth key.\n")
+        print(f"\n  Run {cyan('aria auth ariax-xxxxx')} to activate.\n")
         sys.exit(1)
 
     enable_logs = "--logs" in args
