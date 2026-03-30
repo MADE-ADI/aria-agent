@@ -1,6 +1,9 @@
-"""Agent configuration — loads from ~/.aria/config.yaml with env var overrides."""
+"""Agent configuration — loads from ~/.aria/config.json with env var overrides."""
 import os
 import sys
+import json
+import secrets
+import string
 
 # ── Paths ────────────────────────────────────────────────────────────
 ARIA_HOME = os.path.expanduser(os.getenv("ARIA_HOME", "~/.aria"))
@@ -15,6 +18,7 @@ USER_SKILLS_DIR = os.path.join(ARIA_HOME, "skills")
 USER_MEMORY_DIR = os.path.join(ARIA_HOME, "memory")
 USER_SESSIONS_DIR = os.path.join(ARIA_HOME, "sessions")
 USER_LOGS_DIR = os.path.join(ARIA_HOME, "logs")
+AUTH_FILE = os.path.join(ARIA_HOME, "auth.json")
 
 # Built-in skills (shipped with source)
 BUILTIN_SKILLS_DIR = os.path.join(ARIA_SRC, "skills")
@@ -80,3 +84,38 @@ SESSIONS_DIR = USER_SESSIONS_DIR
 
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", _cfg.get("log_level", "WARNING"))
+
+
+# ── Auth ─────────────────────────────────────────────────────────────
+def _generate_secret_key() -> str:
+    """Generate a secret key in format ariax-XXXXX...XXXXX (48 random chars)."""
+    charset = string.ascii_lowercase + string.digits
+    random_part = ''.join(secrets.choice(charset) for _ in range(48))
+    return f"ariax-{random_part}"
+
+
+def check_auth() -> dict:
+    """Check auth.json exists and has a valid key.
+    Returns {"ok": True, "key": "ariax-..."} or {"ok": False, "reason": "..."}.
+    """
+    if not os.path.exists(AUTH_FILE):
+        return {"ok": False, "reason": "missing"}
+    try:
+        with open(AUTH_FILE) as f:
+            data = json.load(f)
+        key = data.get("secret_key", "")
+        if not key or not key.startswith("ariax-") or len(key) < 20:
+            return {"ok": False, "reason": "invalid"}
+        return {"ok": True, "key": key}
+    except Exception:
+        return {"ok": False, "reason": "corrupt"}
+
+
+def init_auth() -> str:
+    """Generate auth.json with a new secret key. Returns the key."""
+    key = _generate_secret_key()
+    auth_data = {"secret_key": key}
+    with open(AUTH_FILE, "w") as f:
+        json.dump(auth_data, f, indent=2)
+    os.chmod(AUTH_FILE, 0o600)  # owner read/write only
+    return key

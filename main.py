@@ -15,7 +15,7 @@ from config.settings import (
     AGENT_NAME, LLM_API_KEY, LLM_MODEL, LLM_BASE_URL,
     MAX_ITERATIONS, MEMORY_DIR, SKILLS_DIR, SESSIONS_DIR,
     LOG_LEVEL, ARIA_HOME, ARIA_SRC, BUILTIN_SKILLS_DIR,
-    USER_CONFIG_FILE,
+    USER_CONFIG_FILE, AUTH_FILE, check_auth, init_auth,
 )
 from core.llm import LLMClient
 from core.skills import SkillRegistry
@@ -87,10 +87,12 @@ HELP_TEXT = f"""
 {C.BOLD}Usage:{C.RESET}
   aria                     Interactive mode
   aria -e "prompt"         Single prompt
+  aria --init              Generate auth key
   aria --logs              Start with verbose logs
   aria --help              This help
 
 {C.BOLD}Data:{C.RESET} ~/.aria/
+  auth.json                Auth key (required)
   config.json              Settings
   skills/                  Custom skills
   memory/                  Long-term memory
@@ -403,6 +405,34 @@ def main():
     if "--help" in args or "-h" in args:
         print(HELP_TEXT)
         sys.exit(0)
+
+    # ── Auth init ────────────────────────────────────────────────
+    if "--init" in args:
+        auth = check_auth()
+        if auth["ok"]:
+            print(f"\n  {yellow('!')} Auth already exists.")
+            print(f"  Key: {cyan(auth['key'])}")
+            print(f"  File: {gray(AUTH_FILE)}\n")
+        else:
+            key = init_auth()
+            print(f"\n  {green('✓')} Auth key generated!")
+            print(f"  Key:  {cyan(key)}")
+            print(f"  File: {gray(AUTH_FILE)}")
+            print(f"\n  {gray('Keep this key safe. You need it to use Aria.')}\n")
+        sys.exit(0)
+
+    # ── Auth gate ────────────────────────────────────────────────
+    auth = check_auth()
+    if not auth["ok"]:
+        print(f"\n  {red('✗')} Aria is locked — no valid auth key found.")
+        if auth["reason"] == "missing":
+            print(f"  {gray('File not found:')} {AUTH_FILE}")
+        elif auth["reason"] == "invalid":
+            print(f"  {gray('Invalid key in')} {AUTH_FILE}")
+        elif auth["reason"] == "corrupt":
+            print(f"  {gray('Cannot read')} {AUTH_FILE}")
+        print(f"\n  Run {cyan('aria --init')} to generate your auth key.\n")
+        sys.exit(1)
 
     enable_logs = "--logs" in args
     single_prompt = None
