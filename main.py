@@ -459,9 +459,7 @@ def main():
     try:
         while True:
             try:
-                active = session_mgr.get_active()
-                sid = active.id[:8] if active else "none"
-                prompt_str = f"{C.CYAN}{C.BOLD}{AGENT_NAME}{C.RESET} {C.GRAY}{sid}{C.RESET} {C.CYAN}›{C.RESET} "
+                prompt_str = f"{C.CYAN}{C.BOLD}{AGENT_NAME}{C.RESET} {C.CYAN}›{C.RESET} "
 
                 if prompt_session:
                     from prompt_toolkit.formatted_text import ANSI
