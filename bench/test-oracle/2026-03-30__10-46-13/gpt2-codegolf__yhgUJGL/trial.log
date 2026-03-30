@@ -1,0 +1,12 @@
+Trial gpt2-codegolf__yhgUJGL failed: Docker compose command failed for environment gpt2-codegolf. Command: docker compose --project-name gpt2-codegolf__yhgujgl --project-directory /root/.cache/harbor/tasks/CGqXnFmcaVcQCTbCZMpg2T/gpt2-codegolf/environment -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-base.yaml -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml up --detach --wait. Return code: 125. Stdout: unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+. Stderr: None. 
+Docker compose down failed: Docker compose command failed for environment gpt2-codegolf. Command: docker compose --project-name gpt2-codegolf__yhgujgl --project-directory /root/.cache/harbor/tasks/CGqXnFmcaVcQCTbCZMpg2T/gpt2-codegolf/environment -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-base.yaml -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml down --rmi all --volumes --remove-orphans. Return code: 125. Stdout: unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+. Stderr: None. 

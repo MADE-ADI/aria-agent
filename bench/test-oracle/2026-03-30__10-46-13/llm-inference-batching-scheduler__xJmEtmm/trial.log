@@ -1,0 +1,12 @@
+Trial llm-inference-batching-scheduler__xJmEtmm failed: Docker compose command failed for environment llm-inference-batching-scheduler. Command: docker compose --project-name llm-inference-batching-scheduler__xjmetmm --project-directory /root/.cache/harbor/tasks/2Fx6Ues7VLnYo5TdH9smXE/llm-inference-batching-scheduler/environment -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-base.yaml -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml up --detach --wait. Return code: 125. Stdout: unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+. Stderr: None. 
+Docker compose down failed: Docker compose command failed for environment llm-inference-batching-scheduler. Command: docker compose --project-name llm-inference-batching-scheduler__xjmetmm --project-directory /root/.cache/harbor/tasks/2Fx6Ues7VLnYo5TdH9smXE/llm-inference-batching-scheduler/environment -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-base.yaml -f /root/.openclaw/workspace/py-agent/bench/.venv/lib/python3.12/site-packages/harbor/environments/docker/docker-compose-prebuilt.yaml down --rmi all --volumes --remove-orphans. Return code: 125. Stdout: unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+. Stderr: None. 

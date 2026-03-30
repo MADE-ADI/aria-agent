@@ -1,0 +1,28 @@
+{
+    "id": "3b8421e8-be99-44e6-b5e9-358a50a39176",
+    "started_at": "2026-03-30T10:46:29.898963",
+    "finished_at": "2026-03-30T10:46:38.602255",
+    "n_total_trials": 2,
+    "stats": {
+        "n_trials": 2,
+        "n_errors": 2,
+        "evals": {
+            "oracle__terminal-bench": {
+                "n_trials": 0,
+                "n_errors": 2,
+                "metrics": [
+                    {
+                        "mean": 0.0
+                    }
+                ],
+                "reward_stats": {},
+                "exception_stats": {
+                    "RuntimeError": [
+                        "gpt2-codegolf__yhgUJGL",
+                        "llm-inference-batching-scheduler__xJmEtmm"
+                    ]
+                }
+            }
+        }
+    }
+}
