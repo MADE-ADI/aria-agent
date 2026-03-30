@@ -9,7 +9,9 @@ import os
 import logging
 from config.settings import (
     AGENT_NAME, LLM_API_KEY, LLM_MODEL, LLM_BASE_URL,
-    MAX_ITERATIONS, MEMORY_DIR, SKILLS_DIR, LOG_LEVEL,
+    MAX_ITERATIONS, MEMORY_DIR, SKILLS_DIR, SESSIONS_DIR,
+    LOG_LEVEL, ARIA_HOME, ARIA_SRC, BUILTIN_SKILLS_DIR,
+    USER_CONFIG_FILE,
 )
 from core.llm import LLMClient
 from core.skills import SkillRegistry
@@ -26,11 +28,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SESSIONS_DIR = os.path.join(BASE_DIR, "sessions")
 
 # ── Slash commands registry ──────────────────────────────────────────
 SLASH_COMMANDS = {
-    "/skills":   "List loaded skills",
+    "/skills":   "List loaded skills (builtin + user)",
     "/memory":   "Show remembered facts",
     "/sessions": "List all sessions",
     "/session":  "Show current session info",
@@ -40,12 +41,14 @@ SLASH_COMMANDS = {
     "/logs":     "Toggle internal logs (on/off)",
     "/clear":    "Clear conversation context",
     "/model":    "Show or change model",
+    "/config":   "Show config file path & settings",
+    "/path":     "Show all Aria paths",
     "/help":     "Show commands",
     "/quit":     "Save & exit",
 }
 
 HELP_TEXT = f"""
-Aria — Python AI Agent v1.2
+Aria — Python AI Agent v1.3
 
 Usage:
   aria                     Start interactive session
@@ -53,8 +56,15 @@ Usage:
   aria --logs              Start with logs enabled
   aria --help              Show this help
 
+Data directory: ~/.aria/
+  config.yaml    — LLM provider, model, agent settings
+  skills/        — User custom skills (override built-ins)
+  memory/        — Long-term memory storage
+  sessions/      — Session history
+  logs/          — Agent logs
+
 Interactive Commands (type / for autocomplete):
-  /skills          List loaded skills
+  /skills          List loaded skills (builtin + user)
   /memory          Show remembered facts
   /sessions        List all sessions
   /session         Show current session info
@@ -63,17 +73,18 @@ Interactive Commands (type / for autocomplete):
   /end             End current session
   /logs on|off     Show/hide agent internal logs
   /model [name]    Show or change model
+  /config          Show config file & current settings
+  /path            Show all Aria paths
   /clear           Clear conversation context
   /help            Show commands
   /quit            Save & exit
 
 Config:
-  LLM_API_KEY      API key (env var or config/settings.py)
-  LLM_MODEL        Model name (default: claude-sonnet-4-6)
+  Edit ~/.aria/config.yaml or use environment variables:
+  LLM_API_KEY      API key (env var overrides config)
+  LLM_MODEL        Model name
   LLM_BASE_URL     API endpoint
-  AGENT_NAME       Agent display name (default: Aria)
-
-Install dir: {BASE_DIR}
+  AGENT_NAME       Agent display name
 """
 
 
@@ -162,17 +173,23 @@ def print_banner(agent_name: str, skills_count: int, session_id: str):
     print(f"""
 ╔══════════════════════════════════════════╗
 ║  🤖 {agent_name:^36s} ║
-║  Python AI Agent Framework v1.2         ║
+║  Python AI Agent Framework v1.3         ║
 ║  {skills_count} skills loaded | session: {session_id[:16]:16s}║
 ╚══════════════════════════════════════════╝
 
-Type / to see available commands (use arrow keys to navigate)
-Type anything else to chat with {agent_name}
+  Config:  ~/.aria/config.yaml
+  Skills:  ~/.aria/skills/
+  Type / to see commands (arrow keys to navigate)
 """)
 
 
 def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
-    """Handle slash commands. Returns True if command was handled."""
+    """Handle slash commands. Returns True if command was handled, 'quit' to exit."""
+    from config.settings import (
+        USER_CONFIG_FILE, ARIA_HOME, ARIA_SRC, BUILTIN_SKILLS_DIR,
+        SKILLS_DIR, MEMORY_DIR, SESSIONS_DIR, AGENT_NAME, MAX_ITERATIONS,
+        LLM_API_KEY,
+    )
     active = session_mgr.get_active()
 
     if user_input == "/quit":
@@ -191,8 +208,12 @@ def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
     elif user_input == "/skills":
         print("\n📦 Loaded Skills:")
         for s in skills.list_all():
-            print(f"  • {s['name']}: {s['description']}")
-            print(f"    triggers: {', '.join(s['triggers'])}")
+            badge = "📌" if s.get("source") == "user" else "📦"
+            print(f"  {badge} {s['name']}: {s['description']}")
+            print(f"     triggers: {', '.join(s['triggers'])}")
+        builtin_count = sum(1 for s in skills.list_all() if s.get("source") == "builtin")
+        user_count = sum(1 for s in skills.list_all() if s.get("source") == "user")
+        print(f"\n  📦 {builtin_count} built-in  |  📌 {user_count} user (~/.aria/skills/)")
         print()
         return True
 
@@ -301,6 +322,29 @@ def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
             print(f"\n🧪 Model switched to: {new_model}\n")
         return True
 
+    elif user_input == "/config":
+        print(f"\n⚙️  Configuration:")
+        print(f"  Config file:  {USER_CONFIG_FILE}")
+        print(f"  LLM provider: {LLM_API_KEY[:8]}..." if LLM_API_KEY else "  LLM provider: (not set)")
+        print(f"  Model:        {agent.llm.model}")
+        print(f"  Base URL:     {agent.llm.base_url}")
+        print(f"  Agent name:   {AGENT_NAME}")
+        print(f"  Max iters:    {MAX_ITERATIONS}")
+        print(f"\n  Edit: nano ~/.aria/config.yaml\n")
+        return True
+
+    elif user_input == "/path":
+        print(f"\n📁 Aria Paths:")
+        print(f"  Home:      {ARIA_HOME}")
+        print(f"  Config:    {USER_CONFIG_FILE}")
+        print(f"  Skills:    {SKILLS_DIR}  (user)")
+        print(f"  Builtin:   {BUILTIN_SKILLS_DIR}")
+        print(f"  Memory:    {MEMORY_DIR}")
+        print(f"  Sessions:  {SESSIONS_DIR}")
+        print(f"  Source:    {ARIA_SRC}")
+        print()
+        return True
+
     elif user_input.startswith("/"):
         print(f"\n⚠️  Unknown command: {user_input}")
         print("  Type / to see available commands\n")
@@ -338,7 +382,7 @@ def main():
 
     # Init components
     llm = LLMClient(api_key=LLM_API_KEY, model=LLM_MODEL, base_url=LLM_BASE_URL)
-    skills = SkillRegistry(SKILLS_DIR)
+    skills = SkillRegistry(SKILLS_DIR, builtin_skills_dir=BUILTIN_SKILLS_DIR)
     memory = Memory(MEMORY_DIR)
     session_mgr = SessionManager(SESSIONS_DIR)
     agent = Agent(
