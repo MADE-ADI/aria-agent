@@ -10,7 +10,7 @@ ARIA_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _is_installed = ARIA_SRC.rstrip("/").endswith("/.aria/src")
 
 # User data directories (all live under ~/.aria/)
-USER_CONFIG_FILE = os.path.join(ARIA_HOME, "config.yaml")
+USER_CONFIG_FILE = os.path.join(ARIA_HOME, "config.json")
 USER_SKILLS_DIR = os.path.join(ARIA_HOME, "skills")
 USER_MEMORY_DIR = os.path.join(ARIA_HOME, "memory")
 USER_SESSIONS_DIR = os.path.join(ARIA_HOME, "sessions")
@@ -27,65 +27,37 @@ def _ensure_dirs():
 
     # Create default config if not exists
     if not os.path.exists(USER_CONFIG_FILE):
-        default_config = """# ══════════════════════════════════════════
-#  Aria — Configuration
-#  Edit this file to customize your agent
-# ══════════════════════════════════════════
-
-# LLM Provider
-llm:
-  provider: cliproxy
-  api_key: ""          # or set LLM_API_KEY env var
-  model: claude-sonnet-4-6
-  base_url: https://api.openai.com/v1   # change to your provider
-
-# Agent
-agent:
-  name: Aria
-  max_iterations: 10
-
-# Logging
-log_level: WARNING     # DEBUG, INFO, WARNING, ERROR
-"""
+        import json
+        default_config = {
+            "llm": {
+                "provider": "openai",
+                "api_key": "",
+                "model": "gpt-4o",
+                "base_url": "https://api.openai.com/v1"
+            },
+            "agent": {
+                "name": "Aria",
+                "max_iterations": 10
+            },
+            "log_level": "WARNING"
+        }
         with open(USER_CONFIG_FILE, "w") as f:
-            f.write(default_config)
+            json.dump(default_config, f, indent=2)
 
 
 _ensure_dirs()
 
 
 def _load_config() -> dict:
-    """Load config.yaml, return as nested dict."""
+    """Load config.json, return as nested dict."""
     if not os.path.exists(USER_CONFIG_FILE):
         return {}
     try:
-        import yaml
+        import json
         with open(USER_CONFIG_FILE) as f:
-            return yaml.safe_load(f) or {}
-    except ImportError:
-        # Fallback: simple YAML-like parser for basic key: value
-        config = {}
-        current_section = None
-        try:
-            with open(USER_CONFIG_FILE) as f:
-                for line in f:
-                    line = line.rstrip()
-                    if not line or line.lstrip().startswith("#"):
-                        continue
-                    # Section header (no indent)
-                    if not line.startswith(" ") and line.endswith(":"):
-                        current_section = line[:-1].strip()
-                        config[current_section] = {}
-                    elif current_section and ":" in line:
-                        key, _, val = line.strip().partition(":")
-                        key = key.strip()
-                        val = val.strip().strip('"').strip("'")
-                        if val == "":
-                            val = None
-                        config[current_section][key] = val
-        except Exception:
-            pass
-        return config
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 _cfg = _load_config()
@@ -108,5 +80,3 @@ SESSIONS_DIR = USER_SESSIONS_DIR
 
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", _cfg.get("log_level", "WARNING"))
-if isinstance(LOG_LEVEL, str):
-    LOG_LEVEL = LOG_LEVEL.upper()

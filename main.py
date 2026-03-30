@@ -57,7 +57,7 @@ Usage:
   aria --help              Show this help
 
 Data directory: ~/.aria/
-  config.yaml    — LLM provider, model, agent settings
+  config.json    — LLM provider, model, agent settings
   skills/        — User custom skills (override built-ins)
   memory/        — Long-term memory storage
   sessions/      — Session history
@@ -80,7 +80,7 @@ Interactive Commands (type / for autocomplete):
   /quit            Save & exit
 
 Config:
-  Edit ~/.aria/config.yaml or use environment variables:
+  Edit ~/.aria/config.json or use environment variables:
   LLM_API_KEY      API key (env var overrides config)
   LLM_MODEL        Model name
   LLM_BASE_URL     API endpoint
@@ -177,7 +177,7 @@ def print_banner(agent_name: str, skills_count: int, session_id: str):
 ║  {skills_count} skills loaded | session: {session_id[:16]:16s}║
 ╚══════════════════════════════════════════╝
 
-  Config:  ~/.aria/config.yaml
+  Config:  ~/.aria/config.json
   Skills:  ~/.aria/skills/
   Type / to see commands (arrow keys to navigate)
 """)
@@ -330,7 +330,7 @@ def handle_command(user_input: str, agent, session_mgr, memory, skills) -> bool:
         print(f"  Base URL:     {agent.llm.base_url}")
         print(f"  Agent name:   {AGENT_NAME}")
         print(f"  Max iters:    {MAX_ITERATIONS}")
-        print(f"\n  Edit: nano ~/.aria/config.yaml\n")
+        print(f"\n  Edit: nano ~/.aria/config.json\n")
         return True
 
     elif user_input == "/path":

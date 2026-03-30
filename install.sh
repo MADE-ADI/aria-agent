@@ -63,7 +63,7 @@ else
         for item in "$ARIA_HOME"/*; do
             base=$(basename "$item")
             case "$base" in
-                src|skills|memory|sessions|logs|config.yaml) continue ;;
+                src|skills|memory|sessions|logs|config.json) continue ;;
                 *) mv "$item" "$SRC_DIR/" 2>/dev/null || true ;;
             esac
         done
@@ -99,32 +99,26 @@ pip3 install -q $PIP_FLAGS -r requirements.txt 2>/dev/null || pip install -q $PI
 ok "Dependencies installed"
 
 # ---- Create default config ----
-if [ ! -f "$ARIA_HOME/config.yaml" ]; then
+if [ ! -f "$ARIA_HOME/config.json" ]; then
     info "Creating default config..."
-    cat > "$ARIA_HOME/config.yaml" << 'CONFIG'
-# ══════════════════════════════════════════
-#  Aria — Configuration
-#  Edit this file to customize your agent
-# ══════════════════════════════════════════
-
-# LLM Provider
-llm:
-  provider: openai
-  api_key: ""            # or set LLM_API_KEY env var
-  model: gpt-4o          # model name
-  base_url: https://api.openai.com/v1
-
-# Agent
-agent:
-  name: Aria
-  max_iterations: 10
-
-# Logging (DEBUG, INFO, WARNING, ERROR)
-log_level: WARNING
+    cat > "$ARIA_HOME/config.json" << 'CONFIG'
+{
+  "llm": {
+    "provider": "openai",
+    "api_key": "",
+    "model": "gpt-4o",
+    "base_url": "https://api.openai.com/v1"
+  },
+  "agent": {
+    "name": "Aria",
+    "max_iterations": 10
+  },
+  "log_level": "WARNING"
+}
 CONFIG
-    ok "Config created: $ARIA_HOME/config.yaml"
+    ok "Config created: $ARIA_HOME/config.json"
 else
-    ok "Config exists: $ARIA_HOME/config.yaml"
+    ok "Config exists: $ARIA_HOME/config.json"
 fi
 
 # ---- Create launcher script ----
@@ -195,11 +189,11 @@ fi
 echo ""
 if [ -z "${LLM_API_KEY:-}" ]; then
     # Check if config has api_key set
-    if grep -q 'api_key: ""' "$ARIA_HOME/config.yaml" 2>/dev/null; then
+    if grep -q 'api_key: ""' "$ARIA_HOME/config.json" 2>/dev/null; then
         warn "LLM_API_KEY not set. Configure before running:"
         echo ""
         echo "  Option 1: Edit config"
-        echo "    nano ~/.aria/config.yaml"
+        echo "    nano ~/.aria/config.json"
         echo ""
         echo "  Option 2: Set environment variable"
         echo "    export LLM_API_KEY=your-api-key"
@@ -213,12 +207,12 @@ echo -e "${GREEN}║  ✅ Aria v1.3 installed!             ║${NC}"
 echo -e "${GREEN}║                                      ║${NC}"
 echo -e "${GREEN}║  Run:    aria                        ║${NC}"
 echo -e "${GREEN}║  Help:   aria --help                 ║${NC}"
-echo -e "${GREEN}║  Config: ~/.aria/config.yaml         ║${NC}"
+echo -e "${GREEN}║  Config: ~/.aria/config.json         ║${NC}"
 echo -e "${GREEN}║  Skills: ~/.aria/skills/             ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════╝${NC}"
 echo ""
 echo "  ~/.aria/"
-echo "  ├── config.yaml    ← your settings"
+echo "  ├── config.json    ← your settings"
 echo "  ├── skills/        ← custom skills go here"
 echo "  ├── memory/        ← agent memory"
 echo "  ├── sessions/      ← session history"
