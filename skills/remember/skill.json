@@ -1,0 +1,9 @@
+{
+  "name": "remember",
+  "description": "Store information in long-term memory for future recall",
+  "triggers": ["remember", "ingat", "catat", "note", "simpan"],
+  "parameters": {
+    "fact": {"type": "string", "required": true, "description": "Information to remember"}
+  },
+  "examples": ["remember my birthday is March 15", "ingat password wifi: guest123"]
+}

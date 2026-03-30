@@ -1,0 +1,11 @@
+{
+  "name": "file_manager",
+  "description": "Read, write, list, and manage files on disk",
+  "triggers": ["read file", "write file", "baca file", "tulis file", "list files", "save to file", "create file", "buat file"],
+  "parameters": {
+    "action": {"type": "string", "required": true, "description": "read, write, list, append, delete"},
+    "path": {"type": "string", "required": true, "description": "File or directory path"},
+    "content": {"type": "string", "required": false, "description": "Content for write/append"}
+  },
+  "examples": ["read file notes.txt", "write file output.md", "list files in ./data"]
+}

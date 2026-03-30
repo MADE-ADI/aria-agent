@@ -1,0 +1,9 @@
+{
+  "name": "weather",
+  "description": "Get current weather and forecast for any location",
+  "triggers": ["weather", "cuaca", "temperature", "suhu", "forecast", "hujan", "rain"],
+  "parameters": {
+    "location": {"type": "string", "required": true, "description": "City name or location"}
+  },
+  "examples": ["weather in Bali", "cuaca Jakarta hari ini"]
+}

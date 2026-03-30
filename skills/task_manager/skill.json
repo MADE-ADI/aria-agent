@@ -1,0 +1,12 @@
+{
+  "name": "task_manager",
+  "description": "Create, list, complete, and manage to-do tasks",
+  "triggers": ["task", "todo", "tugas", "tambah task", "add task", "done task", "list task", "selesai"],
+  "parameters": {
+    "action": {"type": "string", "required": true, "description": "add, list, done, delete"},
+    "title": {"type": "string", "required": false, "description": "Task title (for add)"},
+    "task_id": {"type": "integer", "required": false, "description": "Task ID (for done/delete)"},
+    "priority": {"type": "string", "required": false, "description": "low, medium, high"}
+  },
+  "examples": ["add task: beli kopi", "list tasks", "done task 3"]
+}

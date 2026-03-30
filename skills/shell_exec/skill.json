@@ -1,0 +1,10 @@
+{
+  "name": "shell_exec",
+  "description": "Execute shell commands and return output",
+  "triggers": ["run command", "execute", "jalankan", "shell", "terminal", "bash", "command"],
+  "parameters": {
+    "command": {"type": "string", "required": true, "description": "Shell command to run"},
+    "timeout": {"type": "integer", "required": false, "description": "Timeout in seconds (default 30)"}
+  },
+  "examples": ["run command ls -la", "jalankan pip install requests"]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "web_search",
+  "description": "Search the web for current information using DuckDuckGo",
+  "triggers": ["search", "cari", "google", "find info", "look up", "what is", "siapa", "apa itu"],
+  "parameters": {
+    "query": {"type": "string", "required": true, "description": "Search query"}
+  },
+  "examples": ["search latest news about AI", "cari info tentang Python"]
+}

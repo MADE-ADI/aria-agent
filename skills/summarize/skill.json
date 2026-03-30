@@ -1,0 +1,11 @@
+{
+  "name": "summarize",
+  "description": "Summarize text, URLs, or files into concise points",
+  "triggers": ["summarize", "ringkas", "rangkum", "summary", "tldr", "intisari"],
+  "parameters": {
+    "text": {"type": "string", "required": false, "description": "Text to summarize"},
+    "url": {"type": "string", "required": false, "description": "URL to fetch and summarize"},
+    "file": {"type": "string", "required": false, "description": "File path to read and summarize"}
+  },
+  "examples": ["summarize this article: https://...", "ringkas file notes.md"]
+}

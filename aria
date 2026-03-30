@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Aria launcher — run from anywhere
+ARIA_HOME="${ARIA_HOME:-$HOME/.aria}"
+cd "$ARIA_HOME"
+exec python3 main.py "$@"

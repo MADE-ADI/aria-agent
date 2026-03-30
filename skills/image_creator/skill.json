@@ -1,0 +1,16 @@
+{
+  "name": "image_creator",
+  "description": "Generate images from text prompts using Recraft AI (RecraftV3). Supports photorealistic, digital illustration, vector, and icon styles.",
+  "triggers": ["generate image", "buat gambar", "create image", "draw", "illustrate", "gambarkan", "bikin gambar", "generate foto", "buatkan ilustrasi", "make image", "image of"],
+  "parameters": {
+    "prompt": {"type": "string", "required": true, "description": "Text description of the image to generate"},
+    "style": {"type": "string", "required": false, "description": "Style: realistic_image (default), digital_illustration, vector_illustration, icon"},
+    "filename": {"type": "string", "required": false, "description": "Output filename (without extension)"}
+  },
+  "examples": [
+    "generate image of a sunset over Bali rice terraces",
+    "buat gambar kucing bermain di taman",
+    "create a digital illustration of a cyberpunk city",
+    "draw a vector logo of a mountain"
+  ]
+}

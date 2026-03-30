@@ -1,0 +1,9 @@
+{
+  "name": "calculator",
+  "description": "Evaluate mathematical expressions safely",
+  "triggers": ["calculate", "hitung", "math", "berapa", "kalkulasi", "compute"],
+  "parameters": {
+    "expression": {"type": "string", "required": true, "description": "Math expression to evaluate"}
+  },
+  "examples": ["calculate 15% of 200", "hitung 2^10"]
+}
