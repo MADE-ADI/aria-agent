@@ -158,14 +158,35 @@ def _build_prompt_session(session_mgr):
 
 
 def _dw(text: str) -> int:
-    """Display width — accounts for wide chars (emoji, CJK)."""
+    """Display width — accounts for wide chars (emoji, CJK).
+    Most terminals render emoji as 2 cells wide."""
     import unicodedata
     w = 0
-    for ch in text:
-        if unicodedata.east_asian_width(ch) in ("W", "F"):
+    i = 0
+    chars = list(text)
+    while i < len(chars):
+        ch = chars[i]
+        cp = ord(ch)
+        # Skip variation selectors and zero-width joiners
+        if cp in (0xFE0E, 0xFE0F, 0x200D):
+            i += 1
+            continue
+        cat = unicodedata.category(ch)
+        eaw = unicodedata.east_asian_width(ch)
+        if eaw in ("W", "F"):
             w += 2
+        elif cp >= 0x1F000:
+            # Emoji and symbols above U+1F000 are typically 2 wide
+            w += 2
+        elif cp >= 0x2600 and cp <= 0x27BF:
+            # Misc symbols & dingbats
+            w += 2
+        elif cat == "Mn":
+            # Combining marks — zero width
+            pass
         else:
             w += 1
+        i += 1
     return w
 
 
@@ -175,33 +196,30 @@ def _pad(text: str, width: int) -> str:
     return text + " " * max(0, need)
 
 
-BOX_INNER = 36  # chars between "│ " and " │"
+BOX_W = 38  # total visible chars between │ and │
 
 
 def _boxline(text_plain: str, text_ansi: str = None) -> str:
-    """Create a box line: │  content                         │
-    text_plain = the text without ANSI (for width calc).
-    text_ansi  = the text with ANSI colors (for display). If None, uses text_plain.
-    """
+    """Create a box line with exact alignment: │content + padding│"""
     if text_ansi is None:
         text_ansi = text_plain
-    pad = BOX_INNER - _dw(text_plain)
-    return f"  {C.CYAN}│{C.RESET} {text_ansi}{' ' * max(0, pad)}{C.CYAN}│{C.RESET}"
+    pad = BOX_W - _dw(text_plain)
+    return f"  {C.CYAN}│{C.RESET}{text_ansi}{' ' * max(0, pad)}{C.CYAN}│{C.RESET}"
 
 
 def print_banner(agent_name: str, model: str, skills_count: int, session_id: str):
-    model_short = model[:30]
-    skills_str = f"{skills_count} skills · {session_id[:12]}"
-    border = "─" * (BOX_INNER + 2)
+    model_short = model[:34]
+    skills_str = f"{skills_count} skills | {session_id[:12]}"
+    border = "─" * BOX_W
 
     print()
     print(f"  {C.CYAN}┌{border}┐{C.RESET}")
-    print(_boxline(f" 🤖 {agent_name}", f" 🤖 {C.BOLD}{agent_name}{C.RESET}"))
-    print(_boxline(f" {model_short}", f" {C.GRAY}{model_short}{C.RESET}"))
-    print(_boxline(f" {skills_str}", f" {C.GRAY}{skills_str}{C.RESET}"))
+    print(_boxline(f"  {agent_name}",       f"  {C.BOLD}{agent_name}{C.RESET}"))
+    print(_boxline(f"  {model_short}",      f"  {C.GRAY}{model_short}{C.RESET}"))
+    print(_boxline(f"  {skills_str}",       f"  {C.GRAY}{skills_str}{C.RESET}"))
     print(f"  {C.CYAN}└{border}┘{C.RESET}")
     print()
-    print(f"  {gray('Type / for commands · /help for details')}")
+    print(f"  {gray('Type / for commands | /help for details')}")
     print()
 
 
