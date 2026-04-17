@@ -16,6 +16,7 @@ from config.settings import (
     MAX_ITERATIONS, MEMORY_DIR, SKILLS_DIR, SESSIONS_DIR,
     LOG_LEVEL, ARIA_HOME, ARIA_SRC, BUILTIN_SKILLS_DIR,
     USER_CONFIG_FILE, AUTH_FILE, check_auth, init_auth,
+    DEFAULT_LLM_URL, DEFAULT_LLM_KEY, DEFAULT_LLM_MODEL, DEFAULT_LLM_PROVIDER,
 )
 from core.llm import LLMClient
 from core.skills import SkillRegistry
@@ -431,15 +432,43 @@ def main():
         if not key.startswith("ariax-") or len(key) < 20:
             print(f"\n  {red('✗')} Invalid key format. Must start with ariax- and be at least 20 chars.\n")
             sys.exit(1)
-        # Save the key
+        # Save the ariax- activation key (gate only — not used for LLM calls)
         import json as _json
         os.makedirs(os.path.dirname(AUTH_FILE), exist_ok=True)
         with open(AUTH_FILE, "w") as f:
             _json.dump({"secret_key": key}, f, indent=2)
         os.chmod(AUTH_FILE, 0o600)
+
+        # Wire config.json to the hardcoded LLM proxy. The ariax- key
+        # only gates access; real LLM calls go through the shared proxy.
+        try:
+            os.makedirs(os.path.dirname(USER_CONFIG_FILE), exist_ok=True)
+            if os.path.exists(USER_CONFIG_FILE):
+                with open(USER_CONFIG_FILE) as f:
+                    cfg = _json.load(f)
+                if not isinstance(cfg, dict):
+                    cfg = {}
+            else:
+                cfg = {}
+            cfg["llm"] = {
+                "provider": DEFAULT_LLM_PROVIDER,
+                "api_key": DEFAULT_LLM_KEY,
+                "model": DEFAULT_LLM_MODEL,
+                "base_url": DEFAULT_LLM_URL,
+            }
+            cfg.setdefault("agent", {"name": "Aria", "max_iterations": 10})
+            cfg.setdefault("log_level", "WARNING")
+            with open(USER_CONFIG_FILE, "w") as f:
+                _json.dump(cfg, f, indent=2)
+            cfg_note = f"  Model:  {cyan(DEFAULT_LLM_MODEL)} {gray(f'@ {DEFAULT_LLM_URL}')}"
+        except Exception as e:
+            cfg_note = f"  {yellow('!')} Could not update config.json: {e}"
+
         print(f"\n  {green('✓')} Authenticated!")
-        print(f"  Key:  {cyan(key[:12])}...{cyan(key[-6:])}")
-        print(f"  File: {gray(AUTH_FILE)}\n")
+        print(f"  Key:    {cyan(key[:12])}...{cyan(key[-6:])}")
+        print(f"  Auth:   {gray(AUTH_FILE)}")
+        print(cfg_note)
+        print()
         sys.exit(0)
 
     # ── Auth gate ────────────────────────────────────────────────

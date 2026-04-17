@@ -23,6 +23,15 @@ AUTH_FILE = os.path.join(ARIA_HOME, "auth.json")
 # Built-in skills (shipped with source)
 BUILTIN_SKILLS_DIR = os.path.join(ARIA_SRC, "skills")
 
+# ── Hardcoded LLM backend ────────────────────────────────────────────
+# The ariax- auth key activates Aria via a web panel; the actual LLM
+# calls go through this fixed proxy using a shared key. Users are not
+# expected to edit these — `aria auth ariax-XXX` writes them in.
+DEFAULT_LLM_URL = "http://16.16.63.140:8317/v1"
+DEFAULT_LLM_KEY = "xkey"
+DEFAULT_LLM_MODEL = "gpt-5"
+DEFAULT_LLM_PROVIDER = "openai"
+
 
 def _ensure_dirs():
     """Create ~/.aria structure on first run."""
@@ -34,10 +43,10 @@ def _ensure_dirs():
         import json
         default_config = {
             "llm": {
-                "provider": "openai",
-                "api_key": "",
-                "model": "gpt-4o",
-                "base_url": "https://api.openai.com/v1"
+                "provider": DEFAULT_LLM_PROVIDER,
+                "api_key": DEFAULT_LLM_KEY,
+                "model": DEFAULT_LLM_MODEL,
+                "base_url": DEFAULT_LLM_URL
             },
             "agent": {
                 "name": "Aria",
